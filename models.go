@@ -262,3 +262,37 @@ type Instruction struct {
 	Text     string `json:"text"`
 	Template string `json:"template"`
 }
+
+// CheckDepositStatusResponse represents the response from checking deposit status
+type CheckDepositStatusResponse struct {
+	Status string       `json:"status"` // FOUND or NOT_FOUND
+	Data   *DepositData `json:"data,omitempty"`
+}
+
+// DepositData represents the detailed deposit information
+type DepositData struct {
+	DepositID             string         `json:"depositId"`
+	Status                string         `json:"status"` // SUBMITTED, ACCEPTED, COMPLETED, FAILED, REJECTED, ENQUEUED
+	Amount                string         `json:"amount"`
+	Currency              string         `json:"currency"`
+	Country               string         `json:"country"`
+	Payer                 PayerDetails   `json:"payer"`
+	CustomerMessage       string         `json:"customerMessage,omitempty"`
+	ClientReferenceID     string         `json:"clientReferenceId,omitempty"`
+	Created               string         `json:"created"`
+	ProviderTransactionID string         `json:"providerTransactionId,omitempty"`
+	Metadata              []MetadataItem `json:"metadata,omitempty"`
+	FailureReason         *FailureReason `json:"failureReason,omitempty"`
+}
+
+// PayerDetails represents payer information in deposit status
+type PayerDetails struct {
+	Type           string              `json:"type"` // MMO (Mobile Money Operator)
+	AccountDetails PayerAccountDetails `json:"accountDetails"`
+}
+
+// PayerAccountDetails represents payer account information
+type PayerAccountDetails struct {
+	PhoneNumber string `json:"phoneNumber"`
+	Provider    string `json:"provider"`
+}

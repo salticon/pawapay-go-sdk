@@ -21,6 +21,7 @@ func main() {
 	pawapayDepositExample()
 	// getWalletBalancesExample()
 	// getActiveConfigurationExample()
+	// getDepositStatusExample()
 }
 
 // Uncomment below to run the web server example instead
@@ -283,5 +284,103 @@ func getActiveConfigurationExample() {
 			}
 		}
 		fmt.Println()
+	}
+}
+
+// Example function to check deposit status
+func getDepositStatusExample() {
+	fmt.Println("\n=== Pawapay-Go Check Deposit Status Example ===")
+
+	// Initialize the Pawapay client with configuration
+	cfg := &pawapay.ConfigOptions{
+		InstanceURL: os.Getenv("PAWAPAY_BASE_URL"),  // e.g., "https://api.sandbox.pawapay.io" for sandbox
+		ApiToken:    os.Getenv("PAWAPAY_API_TOKEN"), // Your Pawapay API token
+	}
+
+	client := pawapay.NewPawapayClient(cfg)
+
+	// Enable debug mode to log HTTP requests and responses
+	client.Debug = true
+
+	// The depositId from a previous deposit request
+	// Replace this with an actual depositId from your system
+	depositID := "8917c345-4791-4285-a416-62f24b6982db"
+
+	// Check deposit status
+	response, err := client.GetDepositStatus(depositID)
+	if err != nil {
+		log.Printf("Error checking deposit status: %v", err)
+		return
+	}
+
+	// Display the status
+	fmt.Printf("\n📊 Deposit Status Check:\n")
+	fmt.Printf("Status: %s\n", response.Status)
+
+	if response.Status == "FOUND" && response.Data != nil {
+		fmt.Printf("\n✅ Deposit Found:\n")
+		fmt.Printf("Deposit ID: %s\n", response.Data.DepositID)
+		fmt.Printf("Status: %s\n", response.Data.Status)
+		fmt.Printf("Amount: %s %s\n", response.Data.Amount, response.Data.Currency)
+		fmt.Printf("Country: %s\n", response.Data.Country)
+		fmt.Printf("Created: %s\n", response.Data.Created)
+
+		// Display payer information
+		fmt.Printf("\n👤 Payer Information:\n")
+		fmt.Printf("Type: %s\n", response.Data.Payer.Type)
+		fmt.Printf("Phone Number: %s\n", response.Data.Payer.AccountDetails.PhoneNumber)
+		fmt.Printf("Provider: %s\n", response.Data.Payer.AccountDetails.Provider)
+
+		// Display optional fields if present
+		if response.Data.CustomerMessage != "" {
+			fmt.Printf("\n💬 Customer Message: %s\n", response.Data.CustomerMessage)
+		}
+
+		if response.Data.ClientReferenceID != "" {
+			fmt.Printf("📝 Client Reference ID: %s\n", response.Data.ClientReferenceID)
+		}
+
+		if response.Data.ProviderTransactionID != "" {
+			fmt.Printf("🔖 Provider Transaction ID: %s\n", response.Data.ProviderTransactionID)
+		}
+
+		// Display metadata if present
+		if len(response.Data.Metadata) > 0 {
+			fmt.Printf("\n📋 Metadata:\n")
+			for _, meta := range response.Data.Metadata {
+				for key, value := range meta {
+					fmt.Printf("  %s: %v\n", key, value)
+				}
+			}
+		}
+
+		// Display failure reason if present
+		if response.Data.FailureReason != nil {
+			fmt.Printf("\n❌ Failure Reason:\n")
+			fmt.Printf("Code: %s\n", response.Data.FailureReason.FailureCode)
+			fmt.Printf("Message: %s\n", response.Data.FailureReason.FailureMessage)
+		}
+
+		// Status interpretation
+		fmt.Printf("\n📌 Status Interpretation:\n")
+		switch response.Data.Status {
+		case "SUBMITTED":
+			fmt.Println("The deposit has been submitted to the provider")
+		case "ACCEPTED":
+			fmt.Println("The deposit has been accepted by the provider")
+		case "COMPLETED":
+			fmt.Println("✅ The deposit has been completed successfully")
+		case "FAILED":
+			fmt.Println("❌ The deposit has failed")
+		case "REJECTED":
+			fmt.Println("❌ The deposit was rejected")
+		case "ENQUEUED":
+			fmt.Println("The deposit is enqueued and waiting to be processed")
+		default:
+			fmt.Printf("Unknown status: %s\n", response.Data.Status)
+		}
+	} else if response.Status == "NOT_FOUND" {
+		fmt.Printf("\n❌ Deposit Not Found\n")
+		fmt.Printf("The deposit with ID %s was not found in the system.\n", depositID)
 	}
 }

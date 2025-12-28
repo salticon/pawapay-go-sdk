@@ -244,3 +244,247 @@ func stringContains(s, substr string) bool {
 	}
 	return false
 }
+
+// TestGetDepositStatus tests the GetDepositStatus method with FOUND status
+func TestGetDepositStatus(t *testing.T) {
+	depositID := "8917c345-4791-4285-a416-62f24b6982db"
+
+	// Create a mock response
+	mockResponse := CheckDepositStatusResponse{
+		Status: "FOUND",
+		Data: &DepositData{
+			DepositID: depositID,
+			Status:    "COMPLETED",
+			Amount:    "123.00",
+			Currency:  "ZMW",
+			Country:   "ZMB",
+			Payer: PayerDetails{
+				Type: "MMO",
+				AccountDetails: PayerAccountDetails{
+					PhoneNumber: "260763456789",
+					Provider:    "MTN_MOMO_ZMB",
+				},
+			},
+			CustomerMessage:       "To ACME company",
+			ClientReferenceID:     "REF-987654321",
+			Created:               "2020-10-19T08:17:01Z",
+			ProviderTransactionID: "12356789",
+			Metadata: []MetadataItem{
+				{"orderId": "ORD-123456789"},
+				{"customerId": "[email protected]"},
+			},
+		},
+	}
+
+	// Create a test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify the request
+		if r.Method != "GET" {
+			t.Errorf("Expected GET request, got %s", r.Method)
+		}
+		expectedPath := "/v2/deposits/" + depositID
+		if r.URL.Path != expectedPath {
+			t.Errorf("Expected path %s, got %s", expectedPath, r.URL.Path)
+		}
+
+		// Check Authorization header
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			t.Error("Authorization header is missing")
+		}
+
+		// Send mock response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(mockResponse)
+	}))
+	defer server.Close()
+
+	// Create client with test server URL
+	client := NewPawapayClient(&ConfigOptions{
+		InstanceURL: server.URL,
+		ApiToken:    "test-token-12345678",
+	})
+
+	// Call the method
+	response, err := client.GetDepositStatus(depositID)
+	if err != nil {
+		t.Fatalf("GetDepositStatus failed: %v", err)
+	}
+
+	// Verify response
+	if response.Status != "FOUND" {
+		t.Errorf("Expected status FOUND, got %s", response.Status)
+	}
+
+	if response.Data == nil {
+		t.Fatal("Expected data to be present")
+	}
+
+	if response.Data.DepositID != depositID {
+		t.Errorf("Expected depositId %s, got %s", depositID, response.Data.DepositID)
+	}
+
+	if response.Data.Status != "COMPLETED" {
+		t.Errorf("Expected status COMPLETED, got %s", response.Data.Status)
+	}
+
+	if response.Data.Amount != "123.00" {
+		t.Errorf("Expected amount 123.00, got %s", response.Data.Amount)
+	}
+
+	if response.Data.Currency != "ZMW" {
+		t.Errorf("Expected currency ZMW, got %s", response.Data.Currency)
+	}
+
+	if response.Data.Payer.AccountDetails.PhoneNumber != "260763456789" {
+		t.Errorf("Expected phone number 260763456789, got %s", response.Data.Payer.AccountDetails.PhoneNumber)
+	}
+}
+
+// TestGetDepositStatus_NotFound tests the GetDepositStatus method with NOT_FOUND status
+func TestGetDepositStatus_NotFound(t *testing.T) {
+	depositID := "00000000-0000-0000-0000-000000000000"
+
+	// Create a mock response
+	mockResponse := CheckDepositStatusResponse{
+		Status: "NOT_FOUND",
+		Data:   nil,
+	}
+
+	// Create a test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(mockResponse)
+	}))
+	defer server.Close()
+
+	// Create client with test server URL
+	client := NewPawapayClient(&ConfigOptions{
+		InstanceURL: server.URL,
+		ApiToken:    "test-token-12345678",
+	})
+
+	// Call the method
+	response, err := client.GetDepositStatus(depositID)
+	if err != nil {
+		t.Fatalf("GetDepositStatus failed: %v", err)
+	}
+
+	// Verify response
+	if response.Status != "NOT_FOUND" {
+		t.Errorf("Expected status NOT_FOUND, got %s", response.Status)
+	}
+
+	if response.Data != nil {
+		t.Error("Expected data to be nil for NOT_FOUND status")
+	}
+}
+
+// TestGetDepositStatus_EmptyDepositID tests validation for empty depositID
+func TestGetDepositStatus_EmptyDepositID(t *testing.T) {
+	client := NewPawapayClient(&ConfigOptions{
+		InstanceURL: "http://localhost",
+		ApiToken:    "test-token",
+	})
+
+	// Call the method with empty depositID
+	_, err := client.GetDepositStatus("")
+	if err == nil {
+		t.Fatal("Expected error for empty depositID, got nil")
+	}
+
+	expectedMsg := "depositID is required"
+	if err.Error() != expectedMsg {
+		t.Errorf("Expected error message '%s', got: %s", expectedMsg, err.Error())
+	}
+}
+
+// TestGetDepositStatus_ErrorResponse tests error handling
+func TestGetDepositStatus_ErrorResponse(t *testing.T) {
+	depositID := "8917c345-4791-4285-a416-62f24b6982db"
+
+	// Create a test server that returns an error
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Timestamp: "2025-12-28T10:00:00Z",
+			Status:    404,
+			Error:     "Not Found",
+			Message:   "Deposit not found",
+			Path:      "/v2/deposits/" + depositID,
+		})
+	}))
+	defer server.Close()
+
+	// Create client with test server URL
+	client := NewPawapayClient(&ConfigOptions{
+		InstanceURL: server.URL,
+		ApiToken:    "test-token",
+	})
+
+	// Call the method
+	_, err := client.GetDepositStatus(depositID)
+	if err == nil {
+		t.Fatal("Expected error, got nil")
+	}
+
+	// Verify error message contains expected information
+	expectedMsg := "pawapay API error"
+	if !contains(err.Error(), expectedMsg) {
+		t.Errorf("Expected error to contain '%s', got: %s", expectedMsg, err.Error())
+	}
+}
+
+// TestGetDepositStatus_WithDebug tests debug mode
+func TestGetDepositStatus_WithDebug(t *testing.T) {
+	depositID := "8917c345-4791-4285-a416-62f24b6982db"
+
+	// Create a simple test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(CheckDepositStatusResponse{
+			Status: "FOUND",
+			Data: &DepositData{
+				DepositID: depositID,
+				Status:    "COMPLETED",
+				Amount:    "100.00",
+				Currency:  "ZMW",
+				Country:   "ZMB",
+				Payer: PayerDetails{
+					Type: "MMO",
+					AccountDetails: PayerAccountDetails{
+						PhoneNumber: "260123456789",
+						Provider:    "MTN_MOMO_ZMB",
+					},
+				},
+				Created: "2025-12-28T10:00:00Z",
+			},
+		})
+	}))
+	defer server.Close()
+
+	// Create client with debug enabled
+	client := NewPawapayClient(&ConfigOptions{
+		InstanceURL: server.URL,
+		ApiToken:    "test-token-12345678",
+	})
+	client.Debug = true
+
+	// Call the method (debug output will be printed to console)
+	response, err := client.GetDepositStatus(depositID)
+	if err != nil {
+		t.Fatalf("GetDepositStatus failed: %v", err)
+	}
+
+	if response.Status != "FOUND" {
+		t.Errorf("Expected status FOUND, got %s", response.Status)
+	}
+
+	if response.Data.DepositID != depositID {
+		t.Errorf("Expected depositId %s, got %s", depositID, response.Data.DepositID)
+	}
+}
