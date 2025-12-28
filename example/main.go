@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	pawapay "github.com/salticon/pawapay-go-sdk"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
+	pawapay "github.com/salticon/pawapay-go-sdk"
 )
 
 func main() {
