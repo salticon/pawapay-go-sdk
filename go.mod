@@ -1,4 +1,4 @@
-module github.com/Iknite-Space/pawapay-go
+module github.com/salticon/pawapay-go-sdk
 
 go 1.23.0
 

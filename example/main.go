@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	pawapay "github.com/Iknite-Space/pawapay-go"
+	pawapay "github.com/salticon/pawapay-go-sdk"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
