@@ -37,6 +37,8 @@ func NewPawapayClient(cfg *ConfigOptions) *Client {
 
 type PawapayAPIClient interface {
 	InitiateDeposit(*InitiateDepositRequestBody) (*RequestDepositResponse, error)
+	GetWalletBalances() (*WalletBalancesResponse, error)
+	GetActiveConfiguration() (*ActiveConfigurationResponse, error)
 }
 
 func (a *Client) InitiateDeposit(payload *InitiateDepositRequestBody) (*RequestDepositResponse, error) {
@@ -132,6 +134,162 @@ func (a *Client) InitiateDeposit(payload *InitiateDepositRequestBody) (*RequestD
 	// Check if the response indicates a rejection with failure reason
 	if body.Status == "REJECTED" && body.FailureReason.FailureCode != "" {
 		return nil, fmt.Errorf("deposit rejected: %s - %s", body.FailureReason.FailureCode, body.FailureReason.FailureMessage)
+	}
+
+	return body, nil
+}
+
+// GetWalletBalances retrieves the list of wallets and their balances configured for your pawaPay account
+func (a *Client) GetWalletBalances() (*WalletBalancesResponse, error) {
+	const walletBalancesRoute = "/wallet-balances"
+
+	httpc := &http.Client{}
+
+	// Build the URL, ensuring no double slashes
+	baseURL := strings.TrimSuffix(a.instanceURL, "/")
+	url := baseURL + "/v2" + walletBalancesRoute
+
+	// Create an http request
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		fmt.Println("Error creating new request\n", err)
+		return nil, err
+	}
+
+	// Add required http headers
+	req.Header.Set("Authorization", "Bearer "+a.authToken)
+
+	// Debug logging for request
+	if a.Debug {
+		fmt.Println("\n========== DEBUG: REQUEST ==========")
+		fmt.Printf("URL: %s\n", url)
+
+		// Mask the token for security (show first 8 chars only)
+		maskedToken := a.authToken
+		if len(maskedToken) > 8 {
+			maskedToken = maskedToken[:8] + "..." + maskedToken[len(maskedToken)-4:]
+		}
+		fmt.Printf("Authorization: Bearer %s\n", maskedToken)
+		fmt.Println("====================================")
+	}
+
+	res, err := httpc.Do(req)
+	if err != nil {
+		fmt.Println("Error making an http request to pawapay\n", err)
+		return nil, err
+	}
+	// Close request body stream in the end
+	defer res.Body.Close()
+
+	// Read response body
+	resBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println("Error reading response body\n", err)
+		return nil, err
+	}
+
+	// Debug logging for response body
+	if a.Debug {
+		fmt.Println("\n========== DEBUG: RESPONSE ==========")
+		fmt.Printf("Status: %d %s\n", res.StatusCode, res.Status)
+		fmt.Println("Body:")
+		fmt.Println(string(resBody))
+		fmt.Println("=====================================")
+	}
+
+	// Check if response is an HTTP error (4xx, 5xx)
+	if res.StatusCode >= 400 {
+		errResp := &ErrorResponse{}
+		if err := json.Unmarshal(resBody, errResp); err != nil {
+			// If we can't parse the error response, return a generic error
+			return nil, fmt.Errorf("HTTP %d: %s", res.StatusCode, string(resBody))
+		}
+		return nil, errResp.ToError()
+	}
+
+	// Parse the response body
+	body := &WalletBalancesResponse{}
+	if err := json.Unmarshal(resBody, body); err != nil {
+		fmt.Println("Error parsing the response body to go struct\n", err)
+		return nil, err
+	}
+
+	return body, nil
+}
+
+// GetActiveConfiguration retrieves the active configuration including countries, providers, and operation types
+func (a *Client) GetActiveConfiguration() (*ActiveConfigurationResponse, error) {
+	const activeConfRoute = "/active-conf"
+
+	httpc := &http.Client{}
+
+	// Build the URL, ensuring no double slashes
+	baseURL := strings.TrimSuffix(a.instanceURL, "/")
+	url := baseURL + "/v2" + activeConfRoute
+
+	// Create an http request
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		fmt.Println("Error creating new request\n", err)
+		return nil, err
+	}
+
+	// Add required http headers
+	req.Header.Set("Authorization", "Bearer "+a.authToken)
+
+	// Debug logging for request
+	if a.Debug {
+		fmt.Println("\n========== DEBUG: REQUEST ==========")
+		fmt.Printf("URL: %s\n", url)
+
+		// Mask the token for security (show first 8 chars only)
+		maskedToken := a.authToken
+		if len(maskedToken) > 8 {
+			maskedToken = maskedToken[:8] + "..." + maskedToken[len(maskedToken)-4:]
+		}
+		fmt.Printf("Authorization: Bearer %s\n", maskedToken)
+		fmt.Println("====================================")
+	}
+
+	res, err := httpc.Do(req)
+	if err != nil {
+		fmt.Println("Error making an http request to pawapay\n", err)
+		return nil, err
+	}
+	// Close request body stream in the end
+	defer res.Body.Close()
+
+	// Read response body
+	resBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println("Error reading response body\n", err)
+		return nil, err
+	}
+
+	// Debug logging for response body
+	if a.Debug {
+		fmt.Println("\n========== DEBUG: RESPONSE ==========")
+		fmt.Printf("Status: %d %s\n", res.StatusCode, res.Status)
+		fmt.Println("Body:")
+		fmt.Println(string(resBody))
+		fmt.Println("=====================================")
+	}
+
+	// Check if response is an HTTP error (4xx, 5xx)
+	if res.StatusCode >= 400 {
+		errResp := &ErrorResponse{}
+		if err := json.Unmarshal(resBody, errResp); err != nil {
+			// If we can't parse the error response, return a generic error
+			return nil, fmt.Errorf("HTTP %d: %s", res.StatusCode, string(resBody))
+		}
+		return nil, errResp.ToError()
+	}
+
+	// Parse the response body
+	body := &ActiveConfigurationResponse{}
+	if err := json.Unmarshal(resBody, body); err != nil {
+		fmt.Println("Error parsing the response body to go struct\n", err)
+		return nil, err
 	}
 
 	return body, nil

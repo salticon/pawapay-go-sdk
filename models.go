@@ -173,3 +173,92 @@ type FailureReason struct {
 	FailureCode    string `json:"failureCode"`
 	FailureMessage string `json:"failureMessage"`
 }
+
+// WalletBalance represents a single wallet balance
+type WalletBalance struct {
+	Country  string `json:"country"`  // ISO 3166-1 alpha-3 country code (e.g., "ZMB", "UGA")
+	Balance  string `json:"balance"`  // Current balance as a string (e.g., "21798.03")
+	Currency string `json:"currency"` // ISO 4217 currency code (e.g., "ZMW", "UGX")
+	Provider string `json:"provider"` // Mobile money provider (may be empty)
+}
+
+// WalletBalancesResponse represents the response from the wallet balances API
+type WalletBalancesResponse struct {
+	Balances []WalletBalance `json:"balances"`
+}
+
+// ActiveConfigurationResponse represents the response from the active configuration API
+type ActiveConfigurationResponse struct {
+	CompanyName            string                 `json:"companyName"`
+	SignatureConfiguration SignatureConfiguration `json:"signatureConfiguration"`
+	Countries              []CountryConfig        `json:"countries"`
+}
+
+// SignatureConfiguration represents signature settings
+type SignatureConfiguration struct {
+	SignedRequestsOnly bool `json:"signedRequestsOnly"`
+	SignedCallbacks    bool `json:"signedCallbacks"`
+}
+
+// CountryConfig represents a country configuration
+type CountryConfig struct {
+	Country     string            `json:"country"`     // ISO 3166-1 alpha-3 country code
+	DisplayName map[string]string `json:"displayName"` // Localized country names
+	Prefix      string            `json:"prefix"`      // Phone number prefix
+	Flag        string            `json:"flag"`        // URL to flag image
+	Providers   []ProviderConfig  `json:"providers"`   // List of providers in this country
+}
+
+// ProviderConfig represents a mobile money provider configuration
+type ProviderConfig struct {
+	Provider                string           `json:"provider"`                // Provider code (e.g., "MTN_MOMO_BEN")
+	DisplayName             string           `json:"displayName"`             // Display name (e.g., "MTN")
+	Logo                    string           `json:"logo"`                    // URL to provider logo
+	NameDisplayedToCustomer string           `json:"nameDisplayedToCustomer"` // Name shown to customer
+	Currencies              []CurrencyConfig `json:"currencies"`              // Supported currencies
+}
+
+// CurrencyConfig represents a currency configuration for a provider
+type CurrencyConfig struct {
+	Currency       string                   `json:"currency"`       // ISO 4217 currency code
+	DisplayName    string                   `json:"displayName"`    // Display name for currency
+	OperationTypes map[string]OperationType `json:"operationTypes"` // Supported operation types
+}
+
+// OperationType represents configuration for a specific operation type
+type OperationType struct {
+	// Common fields for all operation types
+	CallbackURL string `json:"callbackUrl,omitempty"`
+
+	// Fields for DEPOSIT operations
+	AuthType              string                 `json:"authType,omitempty"`
+	PinPrompt             string                 `json:"pinPrompt,omitempty"`
+	PinPromptRevivable    bool                   `json:"pinPromptRevivable,omitempty"`
+	PinPromptInstructions *PinPromptInstructions `json:"pinPromptInstructions,omitempty"`
+
+	// Fields for transactional operations (DEPOSIT, PAYOUT, REFUND, REMITTANCE)
+	MinTransactionLimit string `json:"minTransactionLimit,omitempty"`
+	MaxTransactionLimit string `json:"maxTransactionLimit,omitempty"`
+	DecimalsInAmount    string `json:"decimalsInAmount,omitempty"`
+	Status              string `json:"status,omitempty"` // OPERATIONAL, DELAYED, CLOSED
+}
+
+// PinPromptInstructions represents instructions for PIN prompt revival
+type PinPromptInstructions struct {
+	Channels []Channel `json:"channels"`
+}
+
+// Channel represents a communication channel for PIN prompt instructions
+type Channel struct {
+	Type         string                   `json:"type"`         // e.g., "USSD"
+	DisplayName  map[string]string        `json:"displayName"`  // Localized display names
+	QuickLink    string                   `json:"quickLink"`    // Quick link for the channel
+	Variables    map[string]string        `json:"variables"`    // Variables for instructions
+	Instructions map[string][]Instruction `json:"instructions"` // Localized instructions
+}
+
+// Instruction represents a single instruction step
+type Instruction struct {
+	Text     string `json:"text"`
+	Template string `json:"template"`
+}

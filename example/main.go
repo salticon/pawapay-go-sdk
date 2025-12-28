@@ -16,7 +16,11 @@ func main() {
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
+
+	// Uncomment the example you want to run:
 	pawapayDepositExample()
+	// getWalletBalancesExample()
+	// getActiveConfigurationExample()
 }
 
 // Uncomment below to run the web server example instead
@@ -173,5 +177,111 @@ func pawapayDepositExample() {
 		fmt.Printf("❌ Deposit rejected: %s\n", response.FailureReason.FailureMessage)
 	case "DUPLICATE_IGNORED":
 		fmt.Println("⚠️ Duplicate deposit ignored - this deposit ID was already used.")
+	}
+}
+
+// Example function to get wallet balances
+func getWalletBalancesExample() {
+	fmt.Println("\n=== Pawapay-Go Wallet Balances Example ===")
+
+	// Initialize the Pawapay client with configuration
+	cfg := &pawapay.ConfigOptions{
+		InstanceURL: os.Getenv("PAWAPAY_BASE_URL"),  // e.g., "https://api.sandbox.pawapay.io" for sandbox
+		ApiToken:    os.Getenv("PAWAPAY_API_TOKEN"), // Your Pawapay API token
+	}
+
+	client := pawapay.NewPawapayClient(cfg)
+
+	// Enable debug mode to log HTTP requests and responses
+	client.Debug = true
+
+	// Get wallet balances
+	response, err := client.GetWalletBalances()
+	if err != nil {
+		log.Printf("Error getting wallet balances: %v", err)
+		return
+	}
+
+	// Display the balances
+	fmt.Printf("\n📊 Wallet Balances:\n")
+	fmt.Printf("Found %d wallet(s)\n\n", len(response.Balances))
+
+	for i, balance := range response.Balances {
+		fmt.Printf("Wallet %d:\n", i+1)
+		fmt.Printf("  Country:  %s\n", balance.Country)
+		fmt.Printf("  Currency: %s\n", balance.Currency)
+		fmt.Printf("  Balance:  %s\n", balance.Balance)
+		if balance.Provider != "" {
+			fmt.Printf("  Provider: %s\n", balance.Provider)
+		}
+		fmt.Println()
+	}
+}
+
+// Example function to get active configuration
+func getActiveConfigurationExample() {
+	fmt.Println("\n=== Pawapay-Go Active Configuration Example ===")
+
+	// Initialize the Pawapay client with configuration
+	cfg := &pawapay.ConfigOptions{
+		InstanceURL: os.Getenv("PAWAPAY_BASE_URL"),  // e.g., "https://api.sandbox.pawapay.io" for sandbox
+		ApiToken:    os.Getenv("PAWAPAY_API_TOKEN"), // Your Pawapay API token
+	}
+
+	client := pawapay.NewPawapayClient(cfg)
+
+	// Enable debug mode to log HTTP requests and responses
+	client.Debug = true
+
+	// Get active configuration
+	response, err := client.GetActiveConfiguration()
+	if err != nil {
+		log.Printf("Error getting active configuration: %v", err)
+		return
+	}
+
+	// Display the configuration
+	fmt.Printf("\n📋 Active Configuration:\n")
+	fmt.Printf("Company Name: %s\n", response.CompanyName)
+	fmt.Printf("Signed Requests Only: %v\n", response.SignatureConfiguration.SignedRequestsOnly)
+	fmt.Printf("Signed Callbacks: %v\n\n", response.SignatureConfiguration.SignedCallbacks)
+
+	fmt.Printf("Countries: %d\n\n", len(response.Countries))
+
+	// Display each country and its providers
+	for _, country := range response.Countries {
+		fmt.Printf("🌍 Country: %s (%s)\n", country.DisplayName["en"], country.Country)
+		fmt.Printf("   Phone Prefix: +%s\n", country.Prefix)
+		fmt.Printf("   Providers: %d\n", len(country.Providers))
+
+		for _, provider := range country.Providers {
+			fmt.Printf("\n   📱 Provider: %s (%s)\n", provider.DisplayName, provider.Provider)
+			fmt.Printf("      Name shown to customer: %s\n", provider.NameDisplayedToCustomer)
+
+			for _, currency := range provider.Currencies {
+				fmt.Printf("\n      💰 Currency: %s\n", currency.Currency)
+
+				// Display operation types
+				for opType, opConfig := range currency.OperationTypes {
+					fmt.Printf("         • %s:\n", opType)
+					if opConfig.Status != "" {
+						fmt.Printf("           Status: %s\n", opConfig.Status)
+					}
+					if opConfig.MinTransactionLimit != "" {
+						fmt.Printf("           Min: %s, Max: %s %s\n",
+							opConfig.MinTransactionLimit,
+							opConfig.MaxTransactionLimit,
+							currency.Currency)
+					}
+					if opConfig.AuthType != "" {
+						fmt.Printf("           Auth Type: %s\n", opConfig.AuthType)
+					}
+					if opConfig.CallbackURL != "" {
+						fmt.Printf("           Callback URL: %s\n", opConfig.CallbackURL)
+					}
+				}
+			}
+		}
+		fmt.Println()
 	}
 }
