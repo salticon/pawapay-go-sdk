@@ -296,3 +296,15 @@ type PayerAccountDetails struct {
 	PhoneNumber string `json:"phoneNumber"`
 	Provider    string `json:"provider"`
 }
+
+// PredictProviderRequest represents the request body for predicting a provider
+type PredictProviderRequest struct {
+	PhoneNumber string `json:"phoneNumber"` // The phone number (MSISDN) to predict the provider of
+}
+
+// PredictProviderResponse represents the response from the predict provider API
+type PredictProviderResponse struct {
+	Country     string `json:"country"`     // ISO 3166-1 alpha-3 country code
+	Provider    string `json:"provider"`    // Mobile money provider
+	PhoneNumber string `json:"phoneNumber"` // Correctly formatted phone number
+}

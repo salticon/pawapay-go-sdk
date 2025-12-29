@@ -22,6 +22,7 @@ func main() {
 	// getWalletBalancesExample()
 	// getActiveConfigurationExample()
 	// getDepositStatusExample()
+	// predictProviderExample()
 }
 
 // Uncomment below to run the web server example instead
@@ -383,4 +384,114 @@ func getDepositStatusExample() {
 		fmt.Printf("\n❌ Deposit Not Found\n")
 		fmt.Printf("The deposit with ID %s was not found in the system.\n", depositID)
 	}
+}
+
+// Example function to predict mobile money provider from phone number
+func predictProviderExample() {
+	fmt.Println("\n=== Pawapay-Go Predict Provider Example ===")
+
+	// Initialize the Pawapay client with configuration
+	cfg := &pawapay.ConfigOptions{
+		InstanceURL: os.Getenv("PAWAPAY_BASE_URL"),
+		ApiToken:    os.Getenv("PAWAPAY_API_TOKEN"),
+	}
+
+	client := pawapay.NewPawapayClient(cfg)
+
+	// Enable debug mode to see request/response details
+	client.Debug = true
+
+	// Test phone numbers from different countries
+	testPhoneNumbers := []struct {
+		number      string
+		description string
+	}{
+		{"+260 763-456789", "Zambia MTN"},
+		{"+254 712-345678", "Kenya M-Pesa"},
+		{"+233 244-123456", "Ghana MTN"},
+		{"+256 700-123456", "Uganda MTN"},
+		{"+234 803-123456", "Nigeria MTN"},
+	}
+
+	fmt.Println("\n📱 Testing Provider Prediction for Multiple Phone Numbers:")
+	fmt.Println("=" + string(make([]byte, 60)))
+
+	for i, test := range testPhoneNumbers {
+		fmt.Printf("\n[%d] Testing: %s (%s)\n", i+1, test.number, test.description)
+		fmt.Println("-" + string(make([]byte, 60)))
+
+		response, err := client.PredictProvider(test.number)
+		if err != nil {
+			fmt.Printf("❌ Error: %v\n", err)
+			continue
+		}
+
+		// Display the prediction results
+		fmt.Printf("\n✅ Provider Prediction Successful!\n")
+		fmt.Printf("  📍 Country:      %s\n", response.Country)
+		fmt.Printf("  🏢 Provider:     %s\n", response.Provider)
+		fmt.Printf("  📞 Phone Number: %s (formatted)\n", response.PhoneNumber)
+
+		// Provide additional context based on provider
+		fmt.Printf("\n  ℹ️  Information:\n")
+		switch response.Provider {
+		case "MTN_MOMO_ZMB":
+			fmt.Printf("     - Mobile Money Operator: MTN Mobile Money Zambia\n")
+			fmt.Printf("     - Currency: ZMW (Zambian Kwacha)\n")
+		case "MPESA_KEN":
+			fmt.Printf("     - Mobile Money Operator: M-Pesa Kenya\n")
+			fmt.Printf("     - Currency: KES (Kenyan Shilling)\n")
+		case "MTN_MOMO_GHA":
+			fmt.Printf("     - Mobile Money Operator: MTN Mobile Money Ghana\n")
+			fmt.Printf("     - Currency: GHS (Ghanaian Cedi)\n")
+		case "MTN_MOMO_UGA":
+			fmt.Printf("     - Mobile Money Operator: MTN Mobile Money Uganda\n")
+			fmt.Printf("     - Currency: UGX (Ugandan Shilling)\n")
+		case "MTN_MOMO_NGA":
+			fmt.Printf("     - Mobile Money Operator: MTN Mobile Money Nigeria\n")
+			fmt.Printf("     - Currency: NGN (Nigerian Naira)\n")
+		default:
+			fmt.Printf("     - Provider: %s\n", response.Provider)
+		}
+	}
+
+	// Example: Using prediction result to initiate a deposit
+	fmt.Println("\n\n💡 Use Case: Using Prediction for Deposit Initiation")
+	fmt.Println("=" + string(make([]byte, 60)))
+
+	phoneNumber := "+260763456789"
+	fmt.Printf("\nStep 1: Predict provider for phone number: %s\n", phoneNumber)
+
+	prediction, err := client.PredictProvider(phoneNumber)
+	if err != nil {
+		log.Fatalf("Failed to predict provider: %v", err)
+	}
+
+	fmt.Printf("  ✓ Predicted Provider: %s\n", prediction.Provider)
+	fmt.Printf("  ✓ Country: %s\n", prediction.Country)
+
+	fmt.Println("\nStep 2: Use predicted provider to initiate deposit")
+	fmt.Printf("  → You can now use '%s' as the provider in your deposit request\n", prediction.Provider)
+	fmt.Printf("  → This ensures the correct mobile money operator is used\n")
+
+	// Example deposit payload (not executed)
+	fmt.Println("\nExample Deposit Payload:")
+	fmt.Printf(`  {
+    "depositId": "%s",
+    "amount": "100.00",
+    "currency": "ZMW",
+    "country": "%s",
+    "payer": {
+      "type": "MMO",
+      "accountDetails": {
+        "phoneNumber": "%s",
+        "provider": "%s"
+      }
+    }
+  }
+`, uuid.New().String(), prediction.Country, prediction.PhoneNumber, prediction.Provider)
+
+	fmt.Println("\n✅ Provider Prediction Example Complete!")
+	fmt.Println("\nNote: Average misprediction rate is 0.12%")
+	fmt.Println("      (Benin has higher rate of 6% due to number portability)")
 }

@@ -40,6 +40,7 @@ type PawapayAPIClient interface {
 	GetWalletBalances() (*WalletBalancesResponse, error)
 	GetActiveConfiguration() (*ActiveConfigurationResponse, error)
 	GetDepositStatus(depositID string) (*CheckDepositStatusResponse, error)
+	PredictProvider(phoneNumber string) (*PredictProviderResponse, error)
 }
 
 func (a *Client) InitiateDeposit(payload *InitiateDepositRequestBody) (*RequestDepositResponse, error) {
@@ -516,4 +517,82 @@ func getComponentValue(req *http.Request, comp Component) (string, error) {
 		}
 		return strings.Join(values, ", "), nil
 	}
+}
+
+// PredictProvider predicts the mobile money provider for a given phone number
+func (a *Client) PredictProvider(phoneNumber string) (*PredictProviderResponse, error) {
+	if phoneNumber == "" {
+		return nil, fmt.Errorf("phoneNumber is required")
+	}
+
+	httpc := &http.Client{}
+	baseURL := strings.TrimSuffix(a.instanceURL, "/")
+	url := fmt.Sprintf("%s/v2/predict-provider", baseURL)
+
+	requestBody := PredictProviderRequest{
+		PhoneNumber: phoneNumber,
+	}
+
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+a.authToken)
+
+	if a.Debug {
+		// Mask the token for security (show first 8 chars only)
+		maskedToken := a.authToken
+		if len(maskedToken) > 8 {
+			maskedToken = maskedToken[:8] + "..." + maskedToken[len(maskedToken)-4:]
+		}
+		fmt.Println("\n========== DEBUG: REQUEST ==========")
+		fmt.Printf("URL: %s\n", url)
+		fmt.Printf("Method: POST\n")
+		fmt.Printf("Authorization: Bearer %s\n", maskedToken)
+		fmt.Printf("Body: %s\n", string(jsonData))
+		fmt.Println("====================================")
+	}
+
+	resp, err := httpc.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if a.Debug {
+		fmt.Println("\n========== DEBUG: RESPONSE ==========")
+		fmt.Printf("Status: %d %s\n", resp.StatusCode, resp.Status)
+		fmt.Println("Body:")
+		fmt.Println(string(body))
+		fmt.Println("=====================================")
+	}
+
+	// Check if response is an HTTP error (4xx, 5xx)
+	if resp.StatusCode >= 400 {
+		errResp := &ErrorResponse{}
+		if err := json.Unmarshal(body, errResp); err != nil {
+			// If we can't parse the error response, return a generic error
+			return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+		}
+		return nil, errResp.ToError()
+	}
+
+	var response PredictProviderResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &response, nil
 }

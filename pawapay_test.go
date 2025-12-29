@@ -488,3 +488,214 @@ func TestGetDepositStatus_WithDebug(t *testing.T) {
 		t.Errorf("Expected depositId %s, got %s", depositID, response.Data.DepositID)
 	}
 }
+
+// TestPredictProvider tests the PredictProvider method with a successful response
+func TestPredictProvider(t *testing.T) {
+	// Create a mock response
+	mockResponse := PredictProviderResponse{
+		Country:     "ZMB",
+		Provider:    "MTN_MOMO_ZMB",
+		PhoneNumber: "260763456789",
+	}
+
+	// Create a test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify request method
+		if r.Method != "POST" {
+			t.Errorf("Expected POST request, got %s", r.Method)
+		}
+
+		// Verify request path
+		if r.URL.Path != "/v2/predict-provider" {
+			t.Errorf("Expected path /v2/predict-provider, got %s", r.URL.Path)
+		}
+
+		// Verify Content-Type header
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("Expected Content-Type application/json, got %s", r.Header.Get("Content-Type"))
+		}
+
+		// Verify Authorization header
+		if r.Header.Get("Authorization") == "" {
+			t.Error("Expected Authorization header to be set")
+		}
+
+		// Return mock response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(mockResponse)
+	}))
+	defer server.Close()
+
+	// Create client with test server URL
+	client := NewPawapayClient(&ConfigOptions{
+		InstanceURL: server.URL,
+		ApiToken:    "test-token",
+	})
+
+	// Call PredictProvider
+	phoneNumber := "+260 763-456789"
+	response, err := client.PredictProvider(phoneNumber)
+	if err != nil {
+		t.Fatalf("PredictProvider failed: %v", err)
+	}
+
+	// Verify response
+	if response.Country != "ZMB" {
+		t.Errorf("Expected country ZMB, got %s", response.Country)
+	}
+
+	if response.Provider != "MTN_MOMO_ZMB" {
+		t.Errorf("Expected provider MTN_MOMO_ZMB, got %s", response.Provider)
+	}
+
+	if response.PhoneNumber != "260763456789" {
+		t.Errorf("Expected phoneNumber 260763456789, got %s", response.PhoneNumber)
+	}
+}
+
+// TestPredictProvider_EmptyPhoneNumber tests validation for empty phone number
+func TestPredictProvider_EmptyPhoneNumber(t *testing.T) {
+	client := NewPawapayClient(&ConfigOptions{
+		InstanceURL: "https://api.sandbox.pawapay.io",
+		ApiToken:    "test-token",
+	})
+
+	_, err := client.PredictProvider("")
+	if err == nil {
+		t.Error("Expected error for empty phone number, got nil")
+	}
+
+	if err.Error() != "phoneNumber is required" {
+		t.Errorf("Expected error 'phoneNumber is required', got '%s'", err.Error())
+	}
+}
+
+// TestPredictProvider_ErrorResponse tests handling of HTTP error responses
+func TestPredictProvider_ErrorResponse(t *testing.T) {
+	// Create a test server that returns an error
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Status:  400,
+			Error:   "Bad Request",
+			Message: "Invalid phone number format",
+		})
+	}))
+	defer server.Close()
+
+	client := NewPawapayClient(&ConfigOptions{
+		InstanceURL: server.URL,
+		ApiToken:    "test-token",
+	})
+
+	_, err := client.PredictProvider("+123456789")
+	if err == nil {
+		t.Error("Expected error for bad request, got nil")
+	}
+
+	// Check that error message contains status code
+	if !contains(err.Error(), "400") {
+		t.Errorf("Expected error to contain status code 400, got: %s", err.Error())
+	}
+}
+
+// TestPredictProvider_WithDebug tests debug mode output
+func TestPredictProvider_WithDebug(t *testing.T) {
+	// Create a mock response
+	mockResponse := PredictProviderResponse{
+		Country:     "KEN",
+		Provider:    "MPESA_KEN",
+		PhoneNumber: "254712345678",
+	}
+
+	// Create a test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(mockResponse)
+	}))
+	defer server.Close()
+
+	// Create client with debug enabled
+	client := NewPawapayClient(&ConfigOptions{
+		InstanceURL: server.URL,
+		ApiToken:    "test-token-1234567890",
+	})
+	client.Debug = true
+
+	// Call PredictProvider
+	response, err := client.PredictProvider("+254 712-345678")
+	if err != nil {
+		t.Fatalf("PredictProvider failed: %v", err)
+	}
+
+	if response.Country != "KEN" {
+		t.Errorf("Expected country KEN, got %s", response.Country)
+	}
+}
+
+// TestPredictProvider_DifferentCountries tests provider prediction for different countries
+func TestPredictProvider_DifferentCountries(t *testing.T) {
+	testCases := []struct {
+		name        string
+		phoneNumber string
+		country     string
+		provider    string
+	}{
+		{
+			name:        "Zambia MTN",
+			phoneNumber: "+260763456789",
+			country:     "ZMB",
+			provider:    "MTN_MOMO_ZMB",
+		},
+		{
+			name:        "Kenya M-Pesa",
+			phoneNumber: "+254712345678",
+			country:     "KEN",
+			provider:    "MPESA_KEN",
+		},
+		{
+			name:        "Ghana MTN",
+			phoneNumber: "+233244123456",
+			country:     "GHA",
+			provider:    "MTN_MOMO_GHA",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a test server
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mockResponse := PredictProviderResponse{
+					Country:     tc.country,
+					Provider:    tc.provider,
+					PhoneNumber: tc.phoneNumber,
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(mockResponse)
+			}))
+			defer server.Close()
+
+			client := NewPawapayClient(&ConfigOptions{
+				InstanceURL: server.URL,
+				ApiToken:    "test-token",
+			})
+
+			response, err := client.PredictProvider(tc.phoneNumber)
+			if err != nil {
+				t.Fatalf("PredictProvider failed: %v", err)
+			}
+
+			if response.Country != tc.country {
+				t.Errorf("Expected country %s, got %s", tc.country, response.Country)
+			}
+
+			if response.Provider != tc.provider {
+				t.Errorf("Expected provider %s, got %s", tc.provider, response.Provider)
+			}
+		})
+	}
+}
